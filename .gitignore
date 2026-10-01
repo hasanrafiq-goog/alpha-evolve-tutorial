@@ -1,0 +1,27 @@
+# ==========================================
+# Runtime Artifacts & Evolved Outputs
+# (Must never be committed to Git)
+# ==========================================
+**/evolved_output/
+evolved_output/
+best_model.py
+result.json
+*.png
+
+# ==========================================
+# Local Environment & Secrets
+# ==========================================
+.env
+*.env.local
+.venv/
+env/
+venv/
+
+# ==========================================
+# Python Bytecode & Cache
+# ==========================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
