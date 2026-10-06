@@ -27,7 +27,7 @@ Welcome to the **AlphaEvolve Hands-On Workshop**, tailored specifically for the 
 In enterprise machine learning, designing optimal neural network architectures traditionally requires weeks of trial-and-error by senior ML PhDs or running rigid Bayesian grid searches that only tune numeric hyperparameters (e.g. learning rate, kernel size).
 
 **AlphaEvolve** turns this paradigm on its head:
-* It pairs a **Google Cloud-managed Gemini LLM ensemble** (`gemini-2.5-flash` + `gemini-3.1-pro-preview`) with a **client-side evaluation harness**.
+* It pairs a **Google Cloud-managed Gemini LLM ensemble** (`gemini-3.5-flash` + `gemini-3.1-pro-preview`) with a **client-side evaluation harness**.
 * Instead of tweaking numbers, Gemini **writes and mutates raw Python code**, inventing new topologies, skip connections, activation functions, and normalization blocks.
 * Your local workstation acts as a strict "referee", compiling each candidate, training it on a fast proxy dataset, and feeding scores and runtime errors back to Gemini in a closed evolutionary loop.
 
