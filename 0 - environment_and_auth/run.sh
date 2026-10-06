@@ -40,7 +40,10 @@ if [ "$1" == "--enable-apis" ]; then
     gcloud auth application-default set-quota-project $(gcloud config get-value project)
 fi
 
-# 5. Run the Python verification script
+# 5. Find or create the Gemini Enterprise app and save GE_APP_ID to .env
+python3 ensure_engine.py
+
+# 6. Run the Python verification script
 python3 check_env.py
 
 echo ""
