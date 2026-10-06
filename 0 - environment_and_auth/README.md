@@ -35,7 +35,8 @@ Simply execute the single runner script:
 1. **Verifies or creates `.env`** from template.
 2. **Prompts to configure your fresh GCP project** (enables `discoveryengine`, `aiplatform`, `cloudresourcemanager`, `iam` APIs).
 3. **Sets your ADC quota project** (`gcloud auth application-default set-quota-project`).
-4. **Runs `check_env.py`** to confirm Python packages, ADC tokens, and project settings are healthy.
+4. **Finds or creates your Gemini Enterprise app** (`ensure_engine.py`) and saves its ID as `GE_APP_ID` in `.env`. If the project has no app, it creates `alphaevolve-engine` (billable: Enterprise tier with LLM add-on). Skipped while `PROJECT_ID` is still the placeholder.
+5. **Runs `check_env.py`** to confirm Python packages, ADC tokens, and project settings are healthy.
 
 > **Tip:** You can force the GCP API enablement wizard at any time by running:
 > ```bash
