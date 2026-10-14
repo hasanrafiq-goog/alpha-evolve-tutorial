@@ -4,7 +4,7 @@
 import os
 import sys
 import google.auth
-from google.cloud import discoveryengine_v1alpha as discoveryengine
+from google.cloud import discoveryengine_v1beta as discoveryengine
 from dotenv import dotenv_values
 
 # Styling
@@ -64,7 +64,7 @@ def main():
         engines = list(client.list_engines(request=request))
     except Exception as e:
         print(f"{YELLOW}Note: Unable to list Discovery Engine apps automatically ({e}).{RESET}")
-        return
+        sys.exit(1)
 
     # Check for exact match
     resolved_id = None
@@ -89,6 +89,15 @@ def main():
                     update_env_file(local_env, "GE_APP_ID", resolved_id)
                 break
 
+    # No match but apps exist: use the only one if GE_APP_ID is unset, otherwise ask which one to use
+    if not resolved_id and engines:
+        ids = [e.name.split("/")[-1] for e in engines]
+        if len(ids) > 1 or "your-" not in target_engine_id:
+            print(f"{YELLOW}GE_APP_ID={target_engine_id} not found. Existing apps: {', '.join(ids)}. Set GE_APP_ID in .env to one of them.{RESET}")
+            sys.exit(1)
+        resolved_id = ids[0]
+        update_env_file(env_path, "GE_APP_ID", resolved_id)
+
     # If no match found, create a new engine automatically!
     if not resolved_id and not engines:
         print(f"{YELLOW}No Gemini Enterprise Engine found. Auto-creating a new engine...{RESET}")
@@ -97,6 +106,7 @@ def main():
             new_engine = discoveryengine.Engine(
                 display_name=new_engine_id,
                 solution_type=discoveryengine.SolutionType.SOLUTION_TYPE_SEARCH,
+                app_type=discoveryengine.Engine.AppType.APP_TYPE_INTRANET,
                 search_engine_config=discoveryengine.Engine.SearchEngineConfig(
                     search_tier=discoveryengine.SearchTier.SEARCH_TIER_ENTERPRISE,
                     search_add_ons=[discoveryengine.SearchAddOn.SEARCH_ADD_ON_LLM],
@@ -115,6 +125,7 @@ def main():
             update_env_file(env_path, "GE_APP_ID", resolved_id)
         except Exception as create_err:
             print(f"{YELLOW}Could not auto-create engine: {create_err}{RESET}")
+            sys.exit(1)
 
     if resolved_id:
         print(f"{GREEN}[✓] Gemini Enterprise Engine verified: {BOLD}{resolved_id}{RESET}")

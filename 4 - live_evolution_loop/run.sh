@@ -32,7 +32,7 @@ if [ ! -f "$ENV_FILE" ] || grep -q "your-gcp-project-id" "$ENV_FILE" 2>/dev/null
 fi
 
 # 3. Auto-resolve or create Gemini Enterprise Engine if needed
-python3 ensure_engine.py
+python3 "../0 - environment_and_auth/ensure_engine.py"
 
 # 4. Launch live AlphaEvolve evolutionary loop
 echo ""

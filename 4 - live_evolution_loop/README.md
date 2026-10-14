@@ -4,13 +4,13 @@ Welcome to **Step 4**! In this step, we connect your local machine to **Google C
 
 > [!IMPORTANT]
 > **Prerequisite:** Unlike Steps 1, 2, and 3 which were offline, **Step 4 connects directly to Google Cloud**.
-> Before running `./run.sh`, you **must** update `alpha_evolve_tutorial/.env` with your real `PROJECT_ID` and `GE_APP_ID`.
+> Before running `./run.sh`, you **must** update `alpha_evolve_tutorial/.env` with your real `PROJECT_ID` (`GE_APP_ID` is filled in automatically).
 > (See [Mandatory Configuration: Updating .env](#-mandatory-configuration-updating-env) below).
 
 ---
 
 ## 🎯 Learning Objectives
-1. Understand the **Gemini Ensemble**: combining fast exploration (`gemini-2.5-flash`) with deep reasoning (`gemini-3.1-pro-preview`).
+1. Understand the **Gemini Ensemble**: combining fast exploration (`gemini-3.5-flash`) with deep reasoning (`gemini-3.1-pro-preview`).
 2. Learn how **Sampling Workers** and **Evaluation Workers** operate concurrently.
 3. Observe live evolutionary generations proposing novel convolutions, skip connections, and normalization.
 4. Export the winning neural architecture to `evolved_output/best_model.py`.
@@ -22,7 +22,7 @@ Welcome to **Step 4**! In this step, we connect your local machine to **Google C
 In `.env`, AlphaEvolve configures a weighted ensemble of Gemini models:
 
 ```ini
-MODEL_1=gemini-2.5-flash
+MODEL_1=gemini-3.5-flash
 MODEL_1_WEIGHT=0.7
 
 MODEL_2=gemini-3.1-pro-preview
@@ -30,7 +30,7 @@ MODEL_2_WEIGHT=0.3
 ```
 
 ### Why a Mixture of Flash & Pro?
-* **Gemini 2.5 Flash (70%):** The "Broad Explorer". Generates variations at high velocity and low latency. Ideal for testing new filter widths, activation functions (Swish vs GELU), and dropout rates.
+* **Gemini 3.5 Flash (70%):** The "Broad Explorer". Generates variations at high velocity and low latency. Ideal for testing new filter widths, activation functions (Swish vs GELU), and dropout rates.
 * **Gemini 3.1 Pro Preview (30%):** The "Architectural Thinker". When given previous generation failure tracebacks, Pro diagnoses subtle topological issues, designs multi-branch residual blocks, or restructures the classification head.
 
 ---
@@ -79,20 +79,20 @@ Open the `.env` file in the tutorial root directory:
 # Path: alpha_evolve_tutorial/.env
 ```
 
-Ensure the following two variables have your actual project values:
+Ensure `PROJECT_ID` has your actual project value. `GE_APP_ID` (your Gemini Enterprise app) is filled in automatically by Step 0 or by `run.sh` below:
 
 ```ini
 # Google Cloud Configuration
 PROJECT_ID=your-actual-gcp-project-id       # e.g., my-ml-project-123
-GE_APP_ID=your-alphaevolve-engine-id        # e.g., alphaevolve-engine
+GE_APP_ID=your-alphaevolve-engine-id        # filled in automatically, e.g. alphaevolve-engine
 ```
 
-### Where to find `GE_APP_ID`:
-* In Google Cloud Console, navigate to:
-  **Gemini Enterprise** (or **Discovery Engine**) > **Apps / Engines**.
-* Copy your Engine ID (e.g. `alphaevolve-engine`).
+### How `GE_APP_ID` is set
+* If your project has **no** Gemini Enterprise app, one called `alphaevolve-engine` is created automatically (billable: Enterprise tier with LLM add-on).
+* If your project has exactly **one** app, it is used automatically.
+* If you have **several** apps, set `GE_APP_ID` to the ID or display name of the one to use; the full ID (e.g. `alphaevolve-engine_1234567890`) is resolved automatically. Find it in Google Cloud Console under **Gemini Enterprise** > **Apps**.
 
-> **Shortcut:** You can also configure both automatically using Step 0:
+> **Shortcut:** Step 0 does all of this for you:
 > ```bash
 > cd "../0 - environment_and_auth" && ./run.sh --enable-apis
 > ```
@@ -108,7 +108,7 @@ Once `.env` is updated, execute the single runner script:
 
 ### What `run.sh` does automatically:
 1. **Engine Auto-Discovery:** If you typed a display name like `alphaevolve-engine`, `run.sh` automatically finds the full GCP resource ID (e.g. `alphaevolve-engine_1234567890`) and updates `.env`.
-2. **Auto-Creation:** If no engine exists at all in your project, `run.sh` will auto-create one for you using the Discovery Engine API.
+2. **Auto-Creation:** If no engine exists at all in your project, `run.sh` will auto-create one for you using the Discovery Engine API (same script as Step 0: `../0 - environment_and_auth/ensure_engine.py`). If listing or creating the app fails, `run.sh` stops with the error.
 3. **Session & Experiment Initialization:** Registers Generation 0 (`program.py`).
 4. **Live Search:** Starts the parallel workers to sample code from Gemini and evaluate candidates locally.
 
