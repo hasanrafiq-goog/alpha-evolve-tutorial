@@ -2,7 +2,7 @@
 
 You are tasked with discovering and evolving high-performing Neural Network Architectures for MNIST digit classification using TensorFlow / Keras.
 
-The goal is to evolve the `build_model()` function inside `program.py` to achieve the highest possible validation accuracy (`val_accuracy`), while maintaining computational efficiency and training stability.
+The goal is to evolve the `build_model()` function inside `program.py` to maximize the multi-objective Vertex AI NAS `reward`, optimizing for high validation accuracy while strictly respecting model parameter constraints.
 
 ## Target & Constraints
 
@@ -13,8 +13,11 @@ The goal is to evolve the `build_model()` function inside `program.py` to achiev
    def build_model() -> tf.keras.Model:
        """Constructs and returns a tf.keras.Model instance."""
    ```
-4. **Primary Metric**: `val_accuracy` (higher is better).
-5. **Secondary Metrics**: `param_count` (lower/efficient is better), `val_loss` (lower is better).
+4. **Primary Metric**: `reward` (Vertex AI NAS multi-objective reward combining accuracy and parameter efficiency; higher is better).
+5. **Key Objective Constraints**:
+   - **Target Accuracy**: `val_accuracy > {TARGET_ACCURACY}`. Architectures falling short suffer an exponential penalty.
+   - **Parameter Budget**: Strict ceiling of **< {TARGET_PARAMS} parameters**. Architectures exceeding {TARGET_PARAMS} parameters receive a Vertex AI NAS / MnasNet penalty: `({TARGET_PARAMS} / param_count) ** 1.0`.
+6. **Secondary Metrics**: `val_accuracy`, `param_count`, `val_loss`, `train_time_sec`.
 
 ## Ideas for Evolution & Exploration
 
@@ -27,5 +30,5 @@ Feel free to explore modern deep learning architectural primitives, including:
 
 ## Rules
 - Do NOT hardcode training epochs, optimizers, or loss functions inside `build_model()`; only define the architecture topology.
-- Keep the total parameter count reasonable (under 500,000 parameters) so it trains fast and avoids overfitting.
+- Strictly keep the total parameter count under {TARGET_PARAMS} parameters to avoid NAS penalties and maintain edge-grade efficiency.
 - The returned object MUST be an instantiated `tf.keras.Model` or `tf.keras.Sequential`.

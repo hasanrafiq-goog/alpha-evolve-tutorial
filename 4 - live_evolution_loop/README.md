@@ -13,7 +13,8 @@ Welcome to **Step 4**! In this step, we connect your local machine to **Google C
 1. Understand the **Gemini Ensemble**: combining fast exploration (`gemini-3.5-flash`) with deep reasoning (`gemini-3.1-pro-preview`).
 2. Learn how **Sampling Workers** and **Evaluation Workers** operate concurrently.
 3. Observe live evolutionary generations proposing novel convolutions, skip connections, and normalization.
-4. Export the winning neural architecture to `evolved_output/best_model.py`.
+4. Enforce edge parameter constraints (`TARGET_PARAMS < 50,000`) and accuracy goals via the **Vertex AI NAS Reward**.
+5. Export the **Top N Finalist Architectures** (`rank_1_model.py` through `rank_N_model.py` and `best_model.py`) for the Step 5 Grand Finale.
 
 ---
 
@@ -67,24 +68,33 @@ MODEL_2_WEIGHT=0.3
 2. **Seed Upload:** Uploads `program.py` as Generation 0.
 3. **SamplingWorker:** Polls Google Cloud via `POST ...:acquirePrograms` for candidate models proposed by Gemini.
 4. **EvaluationWorker:** Passes each candidate to your local `mnist_evaluation()` harness (trained on your CPU in ~1.5s).
-5. **Score & Insight Upload:** Submits scores (`val_accuracy`, `param_count`, `train_time_sec`) and diagnostic logs back to Google Cloud.
-6. **Tournament Winner Export:** Once the evaluation budget (e.g. 10 models) is reached, AlphaEvolve downloads the #1 ranked candidate and writes it to `evolved_output/best_model.py`.
+5. **Score & Insight Upload:** Submits scores (`reward`, `val_accuracy`, `param_count`, `train_time_sec`) and diagnostic logs back to Google Cloud.
+6. **Top N Finalists Export:** Once the evaluation budget (e.g. 20 models) is reached, AlphaEvolve downloads the Top $N$ candidates (`rank_1_model.py`, `rank_2_model.py`, ..., `rank_N_model.py`) and writes them to `evolved_output/` along with `best_model.py` and `result.json`.
 
 ## ⚙️ Mandatory Configuration: Updating `.env`
 
-Before launching the live cloud search, your `.env` file must be updated with your real Google Cloud details.
+Before launching the live cloud search, your `.env` file must be updated with your real Google Cloud details and search targets.
 
 Open the `.env` file in the tutorial root directory:
 ```bash
 # Path: alpha_evolve_tutorial/.env
 ```
 
-Ensure `PROJECT_ID` has your actual project value. `GE_APP_ID` (your Gemini Enterprise app) is filled in automatically by Step 0 or by `run.sh` below:
+Ensure `PROJECT_ID` has your actual project value. You can also tune the NAS targets:
 
 ```ini
 # Google Cloud Configuration
 PROJECT_ID=your-actual-gcp-project-id       # e.g., my-ml-project-123
-GE_APP_ID=your-alphaevolve-engine-id        # filled in automatically, e.g. alphaevolve-engine
+GE_APP_ID=your-alphaevolve-engine-id        # filled in automatically
+
+# Multi-Objective NAS Targets & Finalists
+TARGET_PARAMS=50000                         # Parameter ceiling budget (e.g. 50,000)
+TARGET_ACCURACY=0.98                        # Target validation accuracy threshold
+TOP_N_MODELS=3                              # Number of top finalists to export for Step 5
+
+# Search Budget
+MAX_PROGRAMS_GENERATED=20
+MAX_PROGRAMS_EVALUATED=20
 ```
 
 ### How `GE_APP_ID` is set

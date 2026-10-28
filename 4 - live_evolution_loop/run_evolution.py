@@ -29,6 +29,8 @@ from evaluate import (
     INITIAL_PROGRAM_CODE,
     PRIMARY_METRIC_NAME,
     SEED_BOOTSTRAP_SCORE,
+    TARGET_ACCURACY,
+    TARGET_PARAMS,
     mnist_evaluation,
 )
 
@@ -51,16 +53,21 @@ MODEL_2_WEIGHT = float(os.getenv("MODEL_2_WEIGHT", "0.3"))
 # Search Budget & Concurrency
 MAX_PROGRAMS_GENERATED = int(os.getenv("MAX_PROGRAMS_GENERATED", "10"))
 MAX_PROGRAMS_EVALUATED = int(os.getenv("MAX_PROGRAMS_EVALUATED", "10"))
+TOP_N_MODELS = int(os.getenv("TOP_N_MODELS", "3"))
 CONCURRENCY = int(os.getenv("CONCURRENCY", "4"))
 WORKER_CONCURRENCY = int(os.getenv("WORKER_CONCURRENCY", "2"))
 PARALLEL_EVALUATION = os.getenv("PARALLEL_EVALUATION", "True").lower() == "true"
 
 
 def load_instructions() -> str:
-    """Loads system instructions from instructions.md."""
+    """Loads system instructions with dynamically configured target constraints from .env."""
     instructions_path = os.path.join(os.path.dirname(__file__), "instructions.md")
     with open(instructions_path, "r") as f:
-        return f.read()
+        content = f.read()
+    # Inject dynamic targets
+    content = content.replace("{TARGET_PARAMS}", f"{TARGET_PARAMS:,}")
+    content = content.replace("{TARGET_ACCURACY}", f"{TARGET_ACCURACY * 100:.1f}%")
+    return content
 
 
 def main():
@@ -166,27 +173,64 @@ def main():
         output_dir = os.path.join(os.path.dirname(__file__), "evolved_output")
         os.makedirs(output_dir, exist_ok=True)
 
+        top_n_records = []
         for i, prog in enumerate(top_programs):
             score_val = get_score(prog, PRIMARY_METRIC_NAME)
+            val_acc = get_score(prog, "val_accuracy")
+            param_cnt = get_score(prog, "param_count")
             prog_id = prog.get("name", "unknown")
-            logger.info("Rank %d | Program ID: %s | Val Accuracy: %.4f", i + 1, prog_id[-8:], score_val)
+            logger.info(
+                "Rank %d | Program ID: %s | Primary Reward: %.4f | Val Acc: %.4f | Params: %s",
+                i + 1,
+                prog_id[-8:],
+                score_val,
+                val_acc,
+                f"{int(param_cnt):,}" if param_cnt > 0 else "N/A",
+            )
 
-            if i == 0 and score_val > SEED_BOOTSTRAP_SCORE:
-                best_code = prog["content"]["files"][0]["content"]
-                best_file = os.path.join(output_dir, "best_model.py")
-                with open(best_file, "w") as f:
-                    f.write(best_code)
-                meta_file = os.path.join(output_dir, "result.json")
-                with open(meta_file, "w") as f:
-                    json.dump(
-                        {
-                            "program_id": prog_id,
-                            "best_val_accuracy": score_val,
-                        },
-                        f,
-                        indent=2,
-                    )
-                logger.info("Saved best evolved architecture to %s", best_file)
+            if i < TOP_N_MODELS and score_val > SEED_BOOTSTRAP_SCORE:
+                rank_num = i + 1
+                code_content = prog["content"]["files"][0]["content"]
+
+                # Save individual ranked candidate file
+                rank_file = os.path.join(output_dir, f"rank_{rank_num}_model.py")
+                with open(rank_file, "w") as f:
+                    f.write(code_content)
+
+                # Keep best_model.py aligned with Rank 1 for backwards compatibility
+                if i == 0:
+                    best_file = os.path.join(output_dir, "best_model.py")
+                    with open(best_file, "w") as f:
+                        f.write(code_content)
+                    logger.info("Saved Rank 1 champion architecture to %s", best_file)
+
+                logger.info("Exported Rank %d finalist model to %s", rank_num, rank_file)
+
+                top_n_records.append(
+                    {
+                        "rank": rank_num,
+                        "program_id": prog_id,
+                        "reward": float(score_val),
+                        "val_accuracy": float(val_acc),
+                        "param_count": float(param_cnt),
+                        "filename": f"rank_{rank_num}_model.py",
+                    }
+                )
+
+        meta_file = os.path.join(output_dir, "result.json")
+        with open(meta_file, "w") as f:
+            json.dump(
+                {
+                    "program_id": top_n_records[0]["program_id"] if top_n_records else "",
+                    "best_reward": top_n_records[0]["reward"] if top_n_records else 0.0,
+                    "top_n_count": len(top_n_records),
+                    "primary_metric": PRIMARY_METRIC_NAME,
+                    "top_models": top_n_records,
+                },
+                f,
+                indent=2,
+            )
+        logger.info("Saved top %d finalist metadata summary to %s", len(top_n_records), meta_file)
     else:
         logger.warning("No evolved programs returned from experiment.")
 

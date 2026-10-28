@@ -31,11 +31,60 @@ COLLECTION = os.getenv("COLLECTION", "default_collection")
 GE_APP_ID = os.getenv("GE_APP_ID", "your-alphaevolve-engine-id")
 ASSISTANT = os.getenv("ASSISTANT", "default_assistant")
 BASE_URL = os.getenv("BASE_URL", "discoveryengine.googleapis.com")
-PRIMARY_METRIC = "val_accuracy"
+PRIMARY_METRIC = os.getenv("PRIMARY_METRIC_NAME", "reward")
+
+
+def display_live_tournament(programs: list):
+    """Displays the real chronological tournament progression and metrics fetched from Google Cloud."""
+    from alpha_evolve.visualization import get_score
+
+    print("\n" + "=" * 115)
+    print(
+        f"{BOLD}{'RUN #':<6} | {'PROGRAM ID':<22} | {'CREATED TIME':<19} | {'RANK':<7} | {'REWARD':<10} | {'VAL ACC':<10} | {'PARAMS':<10} | {'TRAIN TIME'}{RESET}"
+    )
+    print("=" * 115)
+
+    # Sort chronologically by creation timestamp
+    progs_by_time = sorted(programs, key=lambda p: p.get("createTime", ""))
+
+    # Rank valid programs by primary reward metric
+    valid_progs = [p for p in programs if get_score(p, PRIMARY_METRIC) > -1e5]
+    valid_sorted = sorted(valid_progs, key=lambda p: get_score(p, PRIMARY_METRIC), reverse=True)
+    rank_map = {p.get("name", ""): idx + 1 for idx, p in enumerate(valid_sorted)}
+
+    for run_idx, prog in enumerate(progs_by_time, 1):
+        pid = prog.get("name", "").split("/")[-1]
+        ctime = prog.get("createTime", "")[:19].replace("T", " ")
+        reward = get_score(prog, PRIMARY_METRIC)
+        val_acc = get_score(prog, "val_accuracy")
+        param_cnt = get_score(prog, "param_count")
+        train_time = get_score(prog, "train_time_sec")
+
+        rank_val = rank_map.get(prog.get("name", ""), None)
+        if rank_val is not None:
+            rank_str = f"#{rank_val}"
+            if rank_val == 1:
+                rank_str += " ⭐"
+        else:
+            rank_str = "Seed"
+
+        reward_str = f"{reward:.4f}" if reward > -1e5 else "Bootstrap"
+        acc_str = f"{val_acc*100:.2f}%" if val_acc > 0 else "N/A"
+        params_str = f"{int(param_cnt):,}" if param_cnt > 0 else "N/A"
+        time_str = f"{train_time:.1f}s" if train_time > 0 else "-"
+
+        highlight = GREEN + BOLD if "⭐" in rank_str else ""
+        end_hl = RESET if highlight else ""
+
+        print(
+            f"{highlight}{run_idx:<6} | {pid:<22} | {ctime:<19} | {rank_str:<7} | {reward_str:<10} | {acc_str:<10} | {params_str:<10} | {time_str}{end_hl}"
+        )
+
+    print("=" * 115)
 
 
 def display_cached_tournament():
-    """Displays pre-recorded tournament progression table."""
+    """Displays pre-recorded tournament progression table as an offline fallback."""
     print("\n" + "=" * 105)
     print(f"{BOLD}{'RUN #':<6} | {'PROGRAM ID':<22} | {'CREATED TIME':<19} | {'RANK':<6} | {'VAL ACCURACY':<14} | {'PARAMS':<10} | {'TRAIN TIME'}{RESET}")
     print("=" * 105)
@@ -59,15 +108,13 @@ def display_cached_tournament():
         print(f"{highlight}{r[0]:<6} | {r[1]:<22} | {r[2]:<19} | {r[3]:<6} | {r[4]:<14} | {r[5]:<10} | {r[6]}{end_hl}")
     print("=" * 105)
 
-    plot_path = os.path.join(os.path.dirname(__file__), "evolved_output", "evolution_progress.png")
-    if os.path.exists(plot_path):
-        print(f"\n{GREEN}[✓] Evolution Progress Plot available at:{RESET} {plot_path}")
-
 
 def main():
     print("=" * 75)
     print(f"{BOLD}Step 5: Tournament Progress & Leaderboard Analysis{RESET}")
     print("=" * 75)
+
+    displayed_live = False
 
     # Check if real GCP credentials are configured
     if "your-" not in PROJECT_ID and "your-" not in GE_APP_ID:
@@ -89,17 +136,25 @@ def main():
             if os.path.exists(result_json_path):
                 with open(result_json_path, "r") as f:
                     meta = json.load(f)
-                program_full_id = meta.get("program_id", "")
-                experiment_name = program_full_id.split("/alphaEvolvePrograms/")[0]
-                print(f"Connecting to Cloud Experiment: {experiment_name.split('/')[-1]}...")
-                res = client.list_alpha_evolve_programs(experiment_name)
-                programs = res.get("alphaEvolvePrograms", [])
-                if programs:
-                    print(f"Retrieved {len(programs)} candidates directly from Google Cloud!")
-        except Exception as e:
-            logger.debug("Cloud fetch skipped (%s), falling back to tournament view.", e)
 
-    display_cached_tournament()
+                program_full_id = meta.get("program_id", "")
+                if not program_full_id and "top_models" in meta and meta["top_models"]:
+                    program_full_id = meta["top_models"][0].get("program_id", "")
+
+                if "/alphaEvolvePrograms/" in program_full_id:
+                    experiment_name = program_full_id.split("/alphaEvolvePrograms/")[0]
+                    print(f"Connecting to Cloud Experiment: {experiment_name.split('/')[-1]}...")
+                    res = client.list_alpha_evolve_programs(experiment_name)
+                    programs = res.get("alphaEvolvePrograms", [])
+                    if programs:
+                        print(f"Retrieved {len(programs)} candidates directly from Google Cloud!")
+                        display_live_tournament(programs)
+                        displayed_live = True
+        except Exception as e:
+            logger.debug("Cloud fetch skipped (%s), falling back to offline view.", e)
+
+    if not displayed_live:
+        display_cached_tournament()
 
 
 if __name__ == "__main__":

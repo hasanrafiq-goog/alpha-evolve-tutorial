@@ -23,10 +23,80 @@ from alpha_evolve.models import (
     AlphaEvolveProgramEvaluation,
 )
 
+from dotenv import load_dotenv
+
+# Load .env configuration
+load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
+load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"))
+load_dotenv()
+
 logger = logging.getLogger(__name__)
 
-PRIMARY_METRIC_NAME = "val_accuracy"
+PRIMARY_METRIC_NAME = os.getenv("PRIMARY_METRIC_NAME", "reward")
+TARGET_ACCURACY = float(os.getenv("TARGET_ACCURACY", "0.98"))  # Target: Accuracy > 98%
+TARGET_PARAMS = int(os.getenv("TARGET_PARAMS", "50000"))  # Budget: Parameters (default: 50,000)
 SEED_BOOTSTRAP_SCORE = -1e6
+
+
+def compute_nas_reward(
+    accuracy: float,
+    measured_params: int,
+    target_params: int = TARGET_PARAMS,
+    target_accuracy: float = TARGET_ACCURACY,
+    weight: float = 1.0,
+    use_hard_limit: bool = True,
+) -> Tuple[float, float, float]:
+    """Computes multi-objective reward following the Vertex AI NAS / MnasNet formulation.
+
+    Reference:
+        Vertex AI NAS: https://github.com/google/vertex-ai-nas/blob/main/cloud_nas_utils.py#L383
+        MnasNet Paper: https://arxiv.org/pdf/1807.11626.pdf
+
+    Formulation:
+        Reward = Accuracy * (Accuracy_Ratio ** weight) * (Param_Ratio ** weight)
+
+    Constraints:
+        1. Accuracy Target (> 98%):
+           Accuracy_Ratio = Accuracy / Target_Accuracy
+           If Accuracy >= Target_Accuracy, Accuracy_Ratio is capped at 1.0 (no penalty).
+           If Accuracy < Target_Accuracy, Accuracy_Ratio < 1.0 (penalized).
+        2. Parameter Budget (< 150,000):
+           Param_Ratio = Target_Params / Measured_Params
+           If Measured_Params <= Target_Params, Param_Ratio is capped at 1.0 (no penalty).
+           If Measured_Params > Target_Params, Param_Ratio < 1.0 (penalized).
+
+    Args:
+        accuracy: Measured validation accuracy (0.0 to 1.0).
+        measured_params: Total parameter count of the candidate model.
+        target_params: Maximum parameter budget (default: 150,000).
+        target_accuracy: Minimum accuracy target (default: 0.98).
+        weight: Exponential penalty weight (default: 1.0).
+        use_hard_limit: True to cap ratios at 1.0 (hard limit mode from MnasNet).
+
+    Returns:
+        reward: Combined multi-objective reward value.
+        param_factor: Applied parameter penalty factor in [0.0, 1.0].
+        accuracy_factor: Applied accuracy penalty factor in [0.0, 1.0].
+    """
+    if measured_params <= 0:
+        param_ratio = 1.0
+    else:
+        param_ratio = float(target_params) / float(measured_params)
+
+    if target_accuracy <= 0.0:
+        acc_ratio = 1.0
+    else:
+        acc_ratio = float(accuracy) / float(target_accuracy)
+
+    param_factor = param_ratio**weight
+    acc_factor = acc_ratio**weight
+
+    if use_hard_limit:
+        param_factor = min(param_factor, 1.0)
+        acc_factor = min(acc_factor, 1.0)
+
+    reward = float(accuracy * acc_factor * param_factor)
+    return reward, param_factor, acc_factor
 
 # Cached MNIST dataset partitions for fast repeated evaluation
 _DATA_CACHE: Dict[str, np.ndarray] = {}
@@ -73,7 +143,8 @@ def evaluate_architecture_code(
     epochs: int = 2,
     batch_size: int = 64,
     learning_rate: float = 0.001,
-    verbose: int = 0,
+    target_accuracy: float = TARGET_ACCURACY,
+    target_params: int = TARGET_PARAMS,
 ) -> Tuple[float, Dict[str, float], List[str]]:
     """Executes candidate code, trains the model on MNIST, and computes metrics.
 
@@ -82,10 +153,12 @@ def evaluate_architecture_code(
         epochs: Number of proxy training epochs.
         batch_size: Training batch size.
         learning_rate: Adam optimizer learning rate.
+        target_accuracy: Target validation accuracy threshold (default: 0.98).
+        target_params: Maximum parameter count budget (default: 150,000).
 
     Returns:
-        score: Primary metric value (val_accuracy, 0.0 to 1.0, or negative sentinel on failure).
-        metrics_dict: Auxiliary metrics (val_loss, train_time_sec, param_count).
+        score: Primary metric value (Vertex AI NAS multi-objective reward, 0.0 to 1.0, or negative sentinel on failure).
+        metrics_dict: Auxiliary metrics (reward, val_accuracy, param_count, penalties, val_loss, train_time_sec).
         insights_list: Explanatory insight feedback strings for the LLM.
     """
     insights: List[str] = []
@@ -137,12 +210,6 @@ def evaluate_architecture_code(
     param_count = int(model.count_params())
     metrics["param_count"] = float(param_count)
 
-    # Flag models that exceed budget
-    if param_count > 1_000_000:
-        insights.append(
-            f"Model has {param_count:,} parameters, exceeding the 1M parameter budget."
-        )
-
     # 4. Compile and Train on MNIST Proxy Slice
     try:
         x_tr, y_tr, x_val, y_val = get_mnist_proxy_data()
@@ -161,7 +228,7 @@ def evaluate_architecture_code(
             validation_data=(x_val, y_val),
             epochs=epochs,
             batch_size=batch_size,
-            verbose=verbose,
+            verbose=0,
         )
         elapsed = time.time() - start_time
         metrics["train_time_sec"] = float(elapsed)
@@ -171,11 +238,44 @@ def evaluate_architecture_code(
         metrics["val_loss"] = final_val_loss
         metrics["val_accuracy"] = final_val_acc
 
+        # 5. Compute Vertex AI NAS Multi-Objective Reward
+        reward, param_factor, acc_factor = compute_nas_reward(
+            accuracy=final_val_acc,
+            measured_params=param_count,
+            target_params=target_params,
+            target_accuracy=target_accuracy,
+        )
+        metrics["reward"] = reward
+        metrics["param_penalty_factor"] = param_factor
+        metrics["accuracy_penalty_factor"] = acc_factor
+
+        # 6. Generate Actionable Feedback Insights for Gemini Mutator
+        if param_count > target_params:
+            insights.append(
+                f"Parameter budget exceeded: {param_count:,} > {target_params:,}. "
+                f"Vertex NAS penalty applied: {param_factor:.4f}x."
+            )
+        else:
+            insights.append(
+                f"Parameter budget satisfied: {param_count:,} <= {target_params:,} (factor: 1.0000x)."
+            )
+
+        if final_val_acc < target_accuracy:
+            insights.append(
+                f"Accuracy target not reached: {final_val_acc:.2%} < {target_accuracy:.1%}. "
+                f"Vertex NAS penalty applied: {acc_factor:.4f}x."
+            )
+        else:
+            insights.append(
+                f"Accuracy target satisfied: {final_val_acc:.2%} >= {target_accuracy:.1%} (factor: 1.0000x)."
+            )
+
         insights.append(
-            f"Evaluated successfully. Val Accuracy: {final_val_acc:.4f}, "
+            f"Evaluated successfully. Reward: {reward:.4f} [Accuracy: {final_val_acc:.4f} x "
+            f"AccFactor: {acc_factor:.3f} x ParamFactor: {param_factor:.3f}], "
             f"Val Loss: {final_val_loss:.4f}, Params: {param_count:,}, Train Time: {elapsed:.2f}s."
         )
-        return final_val_acc, metrics, insights
+        return reward, metrics, insights
 
     except Exception as e:
         error_msg = f"Runtime training error: {type(e).__name__}: {e}\n{traceback.format_exc()}"

@@ -7,25 +7,28 @@ In this step, we analyze the tournament progression, inspect the Pareto frontier
 ---
 
 ## 🎯 Learning Objectives
-1. Read and interpret the chronological **tournament progression table** (`RUN #`, `PROGRAM ID`, `VAL ACCURACY`, `PARAMS`).
+1. Read and interpret the live **tournament progression table** directly from Google Cloud (`RUN #`, `PROGRAM ID`, `REWARD`, `VAL ACC`, `PARAMS`, `TRAIN TIME`).
 2. Understand the **Pareto Frontier**: balancing validation accuracy against parameter size and latency.
-3. Run `benchmark_comparison.py` to train the **Naive Baseline** (~87%) vs. the **Evolved Winner** (99%+) side-by-side on the official MNIST test set.
+3. Run `benchmark_comparison.py` to train the **Naive Baseline** vs. **All Top N Finalist Models** side-by-side on the full 60,000-image MNIST dataset (5 epochs) to crown the **Grand Finale Champion 🏆**.
 
 ---
 
 ## 📊 The Tournament Leaderboard
 
-When you run `./run.sh`, Step 5 queries the tournament history and renders the chronological execution sequence:
+When you run `./run.sh`, Step 5 queries the Cloud Program Database and renders the chronological execution sequence:
 
 ```
-=========================================================================================================
-RUN #  | PROGRAM ID             | CREATED TIME        | RANK  | VAL ACCURACY   | PARAMS     | TRAIN TIME
-=========================================================================================================
-1      | 16101992019316122043   | 2026-09-30 20:15:10 | #10   | Naive Baseline | 21,898     | 1.5s
-2      | 14097066499265857194   | 2026-09-30 20:15:20 | #7    | 0.9120         | 165,146    | 2.1s
+===================================================================================================================
+RUN #  | PROGRAM ID             | CREATED TIME        | RANK    | REWARD     | VAL ACC    | PARAMS     | TRAIN TIME
+===================================================================================================================
+1      | 14879421322592945323   | 2026-10-28 20:56:07 | Seed    | Bootstrap  | N/A        | N/A        | -
+2      | 18181523060563699149   | 2026-10-28 20:56:16 | #11     | 0.0165     | 12.70%     | 20,938     | 7.2s
 ...
-N      | 848395831475954795     | 2026-09-30 20:16:05 | #1 ⭐ | 0.9630 (Proxy) | 280,000    | 2.4s
-=========================================================================================================
+7      | 18181523060563701414   | 2026-10-28 20:57:42 | #6      | 0.9132     | 94.60%     | 59,002     | 2.2s
+11     | 18181523060563700544   | 2026-10-28 20:59:32 | #3      | 0.9385     | 95.90%     | 65,994     | 1.8s
+15     | 18181523060563701436   | 2026-10-28 21:01:10 | #2      | 0.9424     | 96.10%     | 74,101     | 1.9s
+16     | 18181523060563699651   | 2026-10-28 21:01:50 | #1 ⭐    | 0.9463     | 96.30%     | 72,266     | 2.6s
+===================================================================================================================
 ```
 
 ### What happened across generations:
@@ -37,17 +40,22 @@ N      | 848395831475954795     | 2026-09-30 20:16:05 | #1 ⭐ | 0.9630 (Proxy) 
 
 ## 🥊 The Grand Finale: Head-to-Head Benchmark Showdown
 
-Step 5 automatically benchmarks your **freshly evolved model from Step 4** against the naive baseline:
+Step 5 automatically benchmarks your **freshly evolved Top N models from Step 4** against the naive baseline on the **full 60,000 dataset**:
 
 ```
-========================================================================================
-METRIC                    | BASELINE MODEL       | YOUR ALPHAEVOLVE WINNER | IMPACT
-========================================================================================
-Validation Accuracy       | ~88.50%              | 99.15%                  | +10.65% leap!
-Test Error Rate           | 11.50% (1,150 errors)| 0.85% (85 errors)       | ~13x fewer errors!
-Validation Loss           | 0.3250               | 0.0245                  | -92% loss reduction
-Parameters                | 21,898               | ~280,000                | Optimal capacity
-========================================================================================
+===============================================================================================
+FINAL RANK   | MODEL NAME                     | PARAMS     | FULL TEST ACC  | ERROR REDUCT  | TRAIN TIME
+===============================================================================================
+#1           | AlphaEvolve Finalist Rank #3 🏆 | 65,994     |  99.20% (+1.73%)  | - 68.4%       |  21.1s
+#2           | AlphaEvolve Finalist Rank #2   | 74,101     |  99.14% (+1.67%)  | - 66.0%       |  21.6s
+#3           | AlphaEvolve Finalist Rank #1   | 72,266     |  99.13% (+1.66%)  | - 65.6%       |  32.6s
+-----------------------------------------------------------------------------------------------
+Reference    | Baseline Seed Model            | 21,898     |  97.47% (Base)    |   0.0%        |   5.5s
+===============================================================================================
+
+🎉 Tournament Conclusion:
+The Grand Finale Champion is AlphaEvolve Finalist Rank #3!
+Achieved 99.20% accuracy on the full dataset (68.4% fewer errors than baseline) with only 65,994 parameters!
 ```
 
 ---
@@ -61,10 +69,10 @@ Execute the single runner script:
 
 ### What happens when you run `./run.sh`:
 1. Activates your virtual environment.
-2. Displays the tournament progression leaderboard.
-3. Automatically detects your newly evolved model from Step 4 (or uses the cached champion).
-4. Trains both the **Naive Baseline** and **Evolved Winner** for 5 epochs on the full dataset with a live progress bar.
-5. Evaluates both on the 10,000-image test set and prints the final scorecard.
+2. Queries Google Cloud to render the live tournament progression leaderboard (`visualize_results.py`).
+3. Automatically detects the Top $N$ evolved models from Step 4 (`evolved_output/rank_*_model.py`).
+4. Trains the **Baseline Model** and all **Top N Finalists** for 5 epochs on the **full 60,000-image dataset** with live training logs.
+5. Evaluates each on the 10,000-image test set and prints the final showdown leaderboard, crowning the Grand Finale Champion 🏆!
 
 ---
 

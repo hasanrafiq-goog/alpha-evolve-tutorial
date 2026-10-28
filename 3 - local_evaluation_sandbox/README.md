@@ -8,9 +8,22 @@ This step runs **100% locally with ZERO Google Cloud API calls and ZERO cost**.
 
 ## 🎯 Learning Objectives
 1. Understand why evaluation runs on the **client-side** (workstation/cluster) rather than on Gemini's cloud servers.
-2. Master the concept of **Proxy Evaluation**: training on a 10,000-image slice for 2 epochs (~1.5 seconds) to achieve rapid evolutionary iterations.
+2. Master the concept of **Proxy Evaluation**: training on a 10,000-image slice for 2 epochs (~0.7 seconds) to achieve rapid evolutionary iterations.
 3. Understand safe sandboxed execution with `exec()` and pre-flight tensor shape validation.
-4. Run `test_evaluator.py` to see the seed model compile and train on your machine.
+4. Learn how the **Vertex AI NAS Multi-Objective Reward** combines accuracy with parameter budget constraints (`< 50,000` params).
+5. Run `test_evaluator.py` to see unit tests and proxy candidate evaluation on your machine.
+
+---
+
+## ⚖️ The Vertex AI NAS Multi-Objective Reward
+
+Following the official Google Cloud Vertex AI NAS and MnasNet formulation ([`cloud_nas_utils.py#L383`](https://github.com/google/vertex-ai-nas/blob/main/cloud_nas_utils.py#L383)), candidates are scored on a balanced multi-objective metric:
+
+$$\text{Reward} = \text{Accuracy} \times \left(\min\left(1.0, \frac{\text{Accuracy}}{\text{Target Accuracy}}\right)\right)^\alpha \times \left(\min\left(1.0, \frac{\text{Target Params}}{\text{Measured Params}}\right)\right)^\beta$$
+
+* **Target Accuracy (`TARGET_ACCURACY = 0.98`):** Models below 98% accuracy suffer a penalty factor $\frac{\text{acc}}{0.98}$. Models meeting or exceeding 98% receive $1.0\times$ (no penalty).
+* **Parameter Budget (`TARGET_PARAMS = 50,000`):** Models under 50,000 parameters receive $1.0\times$ (no penalty). Models exceeding the budget have their reward slashed by $\frac{50,000}{\text{params}}$.
+* **Dynamic Configuration:** Both targets are loaded dynamically from `.env` without modifying code.
 
 ---
 
@@ -71,12 +84,13 @@ Execute the single runner script:
 ```
 
 ### What happens when you run `./run.sh`:
-1. Loads and caches the normalized MNIST proxy dataset.
-2. Compiles `program.py` in an isolated namespace.
-3. Performs a dummy shape check.
-4. Trains the baseline CNN for 2 fast epochs.
-5. Prints the primary metric (`val_accuracy` ~91-94% in proxy), parameter count, and loss.
-6. Simulates the JSON evaluation payload that gets transmitted to Google Cloud in Step 4.
+1. Executes formula unit tests verifying the Vertex AI NAS reward calculation.
+2. Loads and caches the normalized MNIST proxy dataset.
+3. Compiles `program.py` in an isolated namespace and performs dummy shape verification.
+4. Trains the baseline CNN for 2 fast epochs (~0.7s).
+5. Computes the **Vertex AI NAS Reward** balancing accuracy and the parameter budget (`TARGET_PARAMS`).
+6. Generates actionable feedback `insights` (flagging budget satisfaction or deficit).
+7. Validates the structured AlphaEvolve payload format.
 
 ---
 

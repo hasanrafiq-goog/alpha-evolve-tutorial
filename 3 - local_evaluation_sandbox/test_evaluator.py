@@ -1,5 +1,4 @@
-#!/usr/bin/env python3
-"""Local Standalone Evaluation Test (Zero Cloud Calls).
+"""Local standalone test script for the AlphaEvolve MNIST evaluator.
 
 Tests the evaluation pipeline against the baseline seed program (program.py)
 without requiring GCP authentication or the AlphaEvolve API.
@@ -8,58 +7,69 @@ without requiring GCP authentication or the AlphaEvolve API.
 import logging
 import os
 import sys
-import time
 
 from evaluate import (
     INITIAL_PROGRAM_CODE,
+    PRIMARY_METRIC_NAME,
+    TARGET_ACCURACY,
+    TARGET_PARAMS,
+    compute_nas_reward,
     evaluate_architecture_code,
     mnist_evaluation,
 )
 
-# Terminal styling
-CYAN = "\033[0;36m"
-GREEN = "\033[0;32m"
-YELLOW = "\033[1;33m"
-BOLD = "\033[1m"
-RESET = "\033[0m"
-
 
 def main():
-    print("=" * 75)
-    print(f"{BOLD}Step 3: Testing the Local Evaluation Sandbox (Offline Referee){RESET}")
-    print("=" * 75)
+    logging.basicConfig(
+        level=logging.INFO,
+        format="[%(asctime)s] [%(levelname)s] %(message)s",
+        handlers=[logging.StreamHandler(sys.stdout)],
+    )
 
-    print(f"\n{BOLD}1. Why Local Proxy Training?{RESET}")
-    print("   - Training on full MNIST (60,000 images, 50 epochs) takes minutes per candidate.")
-    print("   - We use a proxy split (10,000 train, 2,000 val) and train for only 2 epochs.")
-    print("   - This gives an accurate signal in ~1.5 - 2.0 seconds with ZERO cloud cost!\n")
+    logging.info("=== Testing Local MNIST Architecture Evaluator ===")
 
-    print(f"{CYAN}--- Running Proxy Evaluation on program.py ---{RESET}")
-    print(f"Training on 10,000 images (batch_size=64 -> 156 batches per epoch):")
-    start_time = time.time()
-    val_acc, metrics, insights = evaluate_architecture_code(
+    # Test 0: Unit tests on Vertex AI NAS reward computation
+    logging.info("--- Test 0: Vertex AI NAS Reward Formula Unit Tests ---")
+    # Case A: Meets both targets (Acc 98.5% >= 98%, Params <= TARGET_PARAMS)
+    r1, pf1, af1 = compute_nas_reward(accuracy=0.985, measured_params=int(TARGET_PARAMS * 0.8))
+    assert r1 == 0.985, f"Expected 0.985, got {r1}"
+    assert pf1 == 1.0 and af1 == 1.0
+
+    # Case B: Exceeds parameter budget (Params > TARGET_PARAMS)
+    measured_over = int(TARGET_PARAMS * 1.5)
+    r2, pf2, af2 = compute_nas_reward(accuracy=0.985, measured_params=measured_over)
+    expected_r2 = 0.985 * 1.0 * (TARGET_PARAMS / measured_over)
+    assert abs(r2 - expected_r2) < 1e-6, f"Expected {expected_r2}, got {r2}"
+    assert abs(pf2 - (TARGET_PARAMS / measured_over)) < 1e-6 and af2 == 1.0
+
+    # Case C: Below accuracy threshold (Acc 94.0% < 98%, Params <= TARGET_PARAMS)
+    r3, pf3, af3 = compute_nas_reward(accuracy=0.94, measured_params=int(TARGET_PARAMS * 0.8))
+    expected_r3 = 0.94 * (0.94 / TARGET_ACCURACY) * 1.0
+    assert abs(r3 - expected_r3) < 1e-6, f"Expected {expected_r3}, got {r3}"
+    logging.info(" Vertex NAS reward unit tests passed.")
+
+    logging.info("Evaluating seed program from program.py...")
+
+    # Test 1: Direct evaluation of seed program
+    reward_score, metrics, insights = evaluate_architecture_code(
         code_str=INITIAL_PROGRAM_CODE,
         epochs=2,
         batch_size=64,
-        verbose=1,
     )
-    elapsed = time.time() - start_time
 
-    print(f"\n{BOLD}2. Local Evaluation Results:{RESET}")
-    print(f"  Primary Score (Validation Accuracy) : {GREEN}{BOLD}{val_acc:.4f} ({val_acc*100:.2f}%){RESET}")
-    print(f"  Parameter Count                     : {YELLOW}{metrics.get('param_count', 0):,}{RESET}")
-    print(f"  Training Time                       : {metrics.get('train_time_sec', 0):.2f}s")
-    print(f"  Validation Loss                     : {metrics.get('val_loss', 0):.4f}")
-    print(f"  Total Wall Time                     : {elapsed:.2f}s")
-
-    print(f"\n{BOLD}3. Insights Feedback Generated:{RESET}")
+    logging.info("--- Evaluation Results ---")
+    logging.info("Primary Score (Reward): %.4f", reward_score)
+    for k, v in metrics.items():
+        logging.info("Metric [%s]: %s", k, v)
     for insight in insights:
-        print(f"  - {insight}")
+        logging.info("Insight: %s", insight)
 
-    assert val_acc > 0.70, f"Expected seed model val_accuracy > 0.70, got {val_acc}"
+    assert reward_score > 0.65, f"Expected seed model reward > 0.65, got {reward_score}"
+    assert metrics["val_accuracy"] > 0.75, f"Expected val_accuracy > 0.75, got {metrics['val_accuracy']}"
+    assert metrics["param_count"] <= TARGET_PARAMS, f"Expected params <= {TARGET_PARAMS}, got {metrics['param_count']}"
 
-    # Test candidate payload structure (the format exchanged with GCP)
-    print(f"\n{BOLD}4. Simulating Google Cloud AlphaEvolve Candidate Payload Structure:{RESET}")
+    # Test 2: AlphaEvolve candidate payload format test
+    logging.info("--- Testing AlphaEvolve Candidate Payload Structure ---")
     dummy_candidate = {
         "content": {
             "files": [
@@ -70,14 +80,12 @@ def main():
             ]
         }
     }
-    eval_result = mnist_evaluation(dummy_candidate)
-    print(f"  Payload successfully validated and formatted for GCP Program Database submission!")
 
-    print("\n" + "=" * 75)
-    print(f"{GREEN}{BOLD}✨ Local Evaluator verified and working perfectly!{RESET}")
-    print(f"Next: Run the live cloud evolutionary loop in Step 4:")
-    print(f"{BOLD}cd '../4 - live_evolution_loop' && ./run.sh{RESET}")
-    print("=" * 75)
+    eval_result = mnist_evaluation(dummy_candidate)
+    logging.info("Evaluation Result Object: %s", eval_result)
+    assert eval_result["scores"]["scores"][0]["metric"] == PRIMARY_METRIC_NAME
+
+    logging.info(" All local evaluator tests passed successfully!")
 
 
 if __name__ == "__main__":

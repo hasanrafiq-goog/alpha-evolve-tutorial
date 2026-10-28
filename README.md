@@ -121,7 +121,7 @@ cd "0 - environment_and_auth"
 #### What happens in this step:
 1. Examines `program.py` and inspects `build_model()`.
 2. Prints an ASCII diagram showing how a 28x28 image flows through the layers.
-3. Inspects parameter counts (~295k parameters).
+3. Inspects parameter counts (~21,898 parameters).
 4. Runs a mock forward pass with a sample handwritten digit rendered directly in your terminal using ASCII art!
 
 #### How to execute:
@@ -137,9 +137,9 @@ cd "../1 - the_baseline_model"
 🎯 **Goal:** Master the 3 core pillars governing AlphaEvolve.
 
 #### The 3 Pillars:
-1. **`instructions.md` (The System Prompt):** Tells Gemini the exact rules: input shape `(batch, 28, 28, 1)`, output shape `(batch, 10)`, primary metric `val_accuracy`, and suggested ideas (skip connections, activations, normalization).
+1. **`instructions.md` (The System Prompt):** Tells Gemini the exact rules: input shape `(batch, 28, 28, 1)`, output shape `(batch, 10)`, primary metric `reward` (Vertex AI NAS multi-objective reward combining accuracy and parameter efficiency), and strict constraints (`val_accuracy > 98.0%` and `param_count < 50,000` parameters, dynamically injected from `.env`).
 2. **`# EVOLVE-BLOCK-START` & `# EVOLVE-BLOCK-END`:** The strict mutation boundary. Gemini is only allowed to edit code between these comments. Everything outside (imports, function signature, evaluation harnesses) is immutable.
-3. **`insights` (The Natural Language Feedback Loop):** When Gemini generates invalid code (e.g. negative tensor padding or shape mismatch), the evaluator catches the exception traceback and sends it back to Gemini as an `insight` to prevent repeating the mistake.
+3. **`insights` (The Natural Language Feedback Loop):** When Gemini generates invalid code (e.g. shape mismatch) or violates constraints (e.g. exceeding 50,000 parameters), the evaluator catches it and sends targeted feedback back to Gemini as an `insight` to guide the next mutation.
 
 #### How to execute:
 ```bash
@@ -155,8 +155,10 @@ cd "../2 - the_alphaevolve_contract"
 
 #### Why Local Proxy Evaluation?
 * Training a deep neural network on the full MNIST dataset (60,000 images for 20 epochs) takes minutes. If an evolutionary search tests 50 architectures, that would take hours!
-* **The Proxy Trick:** We subsample a proxy dataset of 10,000 images and train for only **2 epochs** (taking ~1.5 seconds per candidate).
+* **The Proxy Trick:** We subsample a proxy dataset of 10,000 images and train for only **2 epochs** (taking ~0.7 seconds per candidate).
 * The ranking correlation between proxy accuracy and full-training accuracy is > 0.92, making it an ideal surrogate for rapid evolution.
+* **Vertex AI NAS Reward:** Computes multi-objective reward based on Vertex AI NAS / MnasNet (`cloud_nas_utils.py#L383`):
+  $$\text{Reward} = \text{Accuracy} \times \left(\min\left(1.0, \frac{\text{Accuracy}}{\text{Target Accuracy}}\right)\right)^1 \times \left(\min\left(1.0, \frac{\text{Target Params}}{\text{Measured Params}}\right)\right)^1$$
 * **Sandbox Safety:** `evaluate.py` uses an isolated `exec()` namespace with tensor shape assertions `(1, 28, 28, 1) -> (1, 10)` before allocating training memory.
 
 #### How to execute:
@@ -174,16 +176,20 @@ cd "../3 - local_evaluation_sandbox"
 #### How the loop works:
 1. **Initial Registration:** The script registers a session and uploads the seed `program.py` as Generation 0.
 2. **Gemini Ensemble:**
-   * **`gemini-2.5-flash` (70% weight):** Fast, highly creative exploration of new layer combinations.
+   * **`gemini-3.5-flash` (70% weight):** Fast, highly creative exploration of new layer combinations.
    * **`gemini-3.1-pro-preview` (30% weight):** Deep architectural reasoning and nuanced topological refactors.
 3. **Concurrent Workers:**
    * `SamplingWorker`: Asynchronously pulls proposed candidate codes from Google Cloud.
-   * `EvaluationWorker`: Spawns local evaluation threads, runs proxy training, and submits scores + insights back to the cloud database.
+   * `EvaluationWorker`: Spawns local evaluation threads, runs proxy training, computes Vertex AI NAS reward, and submits scores + insights back to the cloud database.
+4. **Top N Finalists Export:** Automatically exports the top $N$ ranked models (`rank_1_model.py`, `rank_2_model.py`, ..., `rank_N_model.py`) as configured by `TOP_N_MODELS` in `.env`.
 
 #### ⚙️ Configuration Prerequisite:
-Before running Step 4, ensure your real GCP values are set in `.env`:
+Before running Step 4, ensure your real GCP values and targets are set in `.env`:
 * `PROJECT_ID`: Your GCP Project ID (e.g. `my-ml-project-123`)
 * `GE_APP_ID`: Your Gemini Enterprise / Discovery Engine App ID (e.g. `alphaevolve-engine`)
+* `TARGET_PARAMS`: Parameter ceiling (default: `50000`)
+* `TARGET_ACCURACY`: Accuracy threshold (default: `0.98`)
+* `TOP_N_MODELS`: Number of top finalists to export for Step 5 (default: `3`)
 
 You can edit `.env` directly, or run:
 ```bash
@@ -200,17 +206,12 @@ cd "../4 - live_evolution_loop"
 
 ### Step 5: Leaderboard, Pareto Trade-offs & Benchmark
 📁 **Directory:** `5 - tournament_analysis_and_benchmark/`  
-🎯 **Goal:** Analyze the tournament results, inspect the winning architecture, and run a head-to-head showdown.
+🎯 **Goal:** Analyze the tournament results, inspect the winning architectures, and run a head-to-head showdown on the full dataset.
 
 #### What happens in this step:
-1. **Leaderboard Analysis:** Queries the Cloud Program Database to display candidate progression over time.
-2. **The Pareto Frontier:** Generates plots balancing **Validation Accuracy** vs. **Parameter Count** vs. **Training Latency**.
-3. **The Winning Architecture Breakdown:** Examines what Gemini discovered in `best_model.py`:
-   * 4 stacked `Conv2D` layers with $3 \times 3$ kernels.
-   * `BatchNormalization` after every convolution.
-   * `swish` ($x \cdot \sigma(x)$) non-linear activation functions.
-   * Multi-stage `Dropout` (0.25 on features, 0.4 on classification head).
-4. **The Grand Finale Showdown:** Compiles and trains the **Baseline Model** vs. **AlphaEvolve Discovered Model** side-by-side on 5 epochs to demonstrate the jump from **94.2% $\to$ 99.24%**!
+1. **Live Leaderboard Analysis:** Queries the Cloud Program Database to display the live chronological 20-run progression table directly from Google Cloud.
+2. **The Top N Showdown:** Compiles and trains the **Baseline Model** vs. **All Top N AlphaEvolve Finalists** side-by-side on the **full 60,000 MNIST dataset** (5 full epochs).
+3. **Crowns the Grand Champion:** Identifies which finalist achieves the highest true generalization accuracy on the full dataset (e.g. **99.20% accuracy** with only ~65k parameters, cutting error rates by >68%)!
 
 #### How to execute:
 ```bash
@@ -249,9 +250,9 @@ sequenceDiagram
             Note over Eval: Local Sandbox Execution
             Eval->>Eval: 1. exec() in safe namespace
             Eval->>Eval: 2. Validate tensor shape (1, 28, 28, 1) -> (1, 10)
-            Eval->>Eval: 3. Fast proxy training (2 epochs, ~1.5s)
-            Eval->>Eval: 4. Extract val_accuracy, params, latency
-            Eval->>Eval: 5. Capture tracebacks as insights
+            Eval->>Eval: 3. Fast proxy training (2 epochs, ~0.7s)
+            Eval->>Eval: 4. Compute Vertex AI NAS Reward (Acc > 98%, Params < 50k)
+            Eval->>Eval: 5. Capture tracebacks & budget feedback as insights
         end
 
         Eval-->>Client: Returns scores & insights
@@ -259,10 +260,10 @@ sequenceDiagram
         Note over Cloud: Cloud Program DB updates Pareto leaderboard
     end
 
-    Note over Trainee,Cloud: Phase 3: Final Tournament Analysis
-    Client->>Cloud: GET /programs (sorted by val_accuracy)
-    Cloud-->>Trainee: Returns winning architecture (best_model.py)
-    Trainee->>Trainee: Benchmark Showdown (Baseline: 94.2% vs Winner: 99.24%)
+    Note over Trainee,Cloud: Phase 3: Final Tournament Analysis & Showdown
+    Client->>Cloud: GET /programs (sorted by reward)
+    Cloud-->>Trainee: Returns Top N finalist architectures (rank_1..rank_N)
+    Trainee->>Trainee: Benchmark Showdown (Baseline vs Top N Finalists on full 60k dataset)
 ```
 
 ---
