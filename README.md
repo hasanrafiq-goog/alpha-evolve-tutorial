@@ -1,6 +1,6 @@
-# Google Cloud PSO Hands-On Workshop: AlphaEvolve Neural Architecture Search (NAS)
+# Google Cloud Hands-On Workshop: AlphaEvolve Neural Architecture Search (NAS)
 
-Welcome to the **AlphaEvolve Hands-On Workshop**, tailored specifically for the **Google Cloud Professional Services Organization (PSO)**. This training is designed to be accessible, engaging, and empowering for both **AI Specialists** and **Non-AI Engineers** (Cloud Architects, Infrastructure Specialists, and Data Consultants).
+Welcome to the **AlphaEvolve Hands-On Workshop**. This training is designed to be accessible, engaging, and empowering for both **AI Specialists** and **Non-AI Engineers** (Cloud Architects, Infrastructure Specialists, and Data Consultants).
 
 ---
 
