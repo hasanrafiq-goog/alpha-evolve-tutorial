@@ -13,7 +13,7 @@ Welcome to **Step 4**! In this step, we connect your local machine to **Google C
 1. Understand the **Gemini Ensemble**: combining fast exploration (`gemini-3.5-flash`) with deep reasoning (`gemini-3.1-pro-preview`).
 2. Learn how **Sampling Workers** and **Evaluation Workers** operate concurrently.
 3. Observe live evolutionary generations proposing novel convolutions, skip connections, and normalization.
-4. Enforce edge parameter constraints (`TARGET_PARAMS < 50,000`) and accuracy goals via the **Vertex AI NAS Reward**.
+4. Enforce edge parameter constraints (`TARGET_PARAMS < 4,000` for micro-nets or `< 50,000` for standard) and accuracy goals via the **Vertex AI NAS Reward**.
 5. Export the **Top N Finalist Architectures** (`rank_1_model.py` through `rank_N_model.py` and `best_model.py`) for the Step 5 Grand Finale.
 
 ---
@@ -88,8 +88,8 @@ PROJECT_ID=your-actual-gcp-project-id       # e.g., my-ml-project-123
 GE_APP_ID=your-alphaevolve-engine-id        # filled in automatically
 
 # Multi-Objective NAS Targets & Finalists
-TARGET_PARAMS=50000                         # Parameter ceiling budget (e.g. 50,000)
-TARGET_ACCURACY=0.98                        # Target validation accuracy threshold
+TARGET_PARAMS=4000                          # Parameter ceiling budget (e.g. 4,000 for edge micro-nets, 50,000 for standard)
+TARGET_ACCURACY=0.94                        # Target validation accuracy threshold (e.g. 0.94 for micro-nets, 0.98 for standard)
 TOP_N_MODELS=3                              # Number of top finalists to export for Step 5
 
 # Search Budget

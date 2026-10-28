@@ -29,9 +29,12 @@ In enterprise machine learning, designing optimal neural network architectures t
 **AlphaEvolve** turns this paradigm on its head:
 * It pairs a **Google Cloud-managed Gemini LLM ensemble** (`gemini-3.5-flash` + `gemini-3.1-pro-preview`) with a **client-side evaluation harness**.
 * Instead of tweaking numbers, Gemini **writes and mutates raw Python code**, inventing new topologies, skip connections, activation functions, and normalization blocks.
-* Your local workstation acts as a strict "referee", compiling each candidate, training it on a fast proxy dataset, and feeding scores and runtime errors back to Gemini in a closed evolutionary loop.
+* Your local workstation acts as a strict "referee", compiling each candidate, training it on a fast proxy dataset, and feeding scores, parameter counts, and runtime errors back to Gemini in a closed evolutionary loop.
+* **Multi-Objective Optimization (Vertex AI NAS / MnasNet)**: Simultaneously optimizes for top-tier accuracy while strictly respecting hard hardware budgets (e.g. `< 50,000` for high accuracy, or `< 3,000` for ultra-constrained microcontrollers).
 
-In this workshop, trainees will watch AlphaEvolve take a naive baseline model (94.2% accuracy) and evolve it into a **99.24% state-of-the-art Convolutional Neural Network (CNN)**.
+In this workshop, trainees will watch AlphaEvolve take a naive baseline model (21,898 params, 97.47% accuracy) and evolve it into a **99.20%+ state-of-the-art CNN**, or under strict edge budgets, compress it into an extraordinary **2,978-parameter micro-net achieving 98.45% accuracy ($7.35\times$ smaller than baseline)!**
+
+![Architecture Evolution: Baseline vs. Evolved Discovery](architecture_comparison.png)
 
 ---
 
@@ -187,8 +190,8 @@ cd "../3 - local_evaluation_sandbox"
 Before running Step 4, ensure your real GCP values and targets are set in `.env`:
 * `PROJECT_ID`: Your GCP Project ID (e.g. `my-ml-project-123`)
 * `GE_APP_ID`: Your Gemini Enterprise / Discovery Engine App ID (e.g. `alphaevolve-engine`)
-* `TARGET_PARAMS`: Parameter ceiling (default: `50000`)
-* `TARGET_ACCURACY`: Accuracy threshold (default: `0.98`)
+* `TARGET_PARAMS`: Parameter ceiling budget (e.g. `4000` for edge micro-architectures, `50000` for standard)
+* `TARGET_ACCURACY`: Accuracy threshold (e.g. `0.94` for micro-nets, `0.98` for standard)
 * `TOP_N_MODELS`: Number of top finalists to export for Step 5 (default: `3`)
 
 You can edit `.env` directly, or run:
@@ -208,10 +211,12 @@ cd "../4 - live_evolution_loop"
 📁 **Directory:** `5 - tournament_analysis_and_benchmark/`  
 🎯 **Goal:** Analyze the tournament results, inspect the winning architectures, and run a head-to-head showdown on the full dataset.
 
+![Google Cloud AlphaEvolve Architecture Search Console](dashboard_screenshot.png)
+
 #### What happens in this step:
 1. **Live Leaderboard Analysis:** Queries the Cloud Program Database to display the live chronological 20-run progression table directly from Google Cloud.
 2. **The Top N Showdown:** Compiles and trains the **Baseline Model** vs. **All Top N AlphaEvolve Finalists** side-by-side on the **full 60,000 MNIST dataset** (5 full epochs).
-3. **Crowns the Grand Champion:** Identifies which finalist achieves the highest true generalization accuracy on the full dataset (e.g. **99.20% accuracy** with only ~65k parameters, cutting error rates by >68%)!
+3. **Crowns the Grand Champion:** Identifies which finalist achieves the highest true generalization accuracy on the full dataset (e.g. **99.20% accuracy** with standard limits, or **98.45% accuracy with only 2,978 parameters** under edge micro-controller constraints)!
 
 #### How to execute:
 ```bash
@@ -278,6 +283,6 @@ sequenceDiagram
 | **2** | **The Contract** | Highlight prompt engineering for code agents. Show why `# EVOLVE-BLOCK` is critical to keep the agent focused. | 15m |
 | **3** | **Local Sandbox** | Explain why evaluation runs locally (cost savings, security, customer data never leaves the local environment). | 20m |
 | **4** | **Live Evolution** | Watch the live tournament. Discuss the Gemini Flash/Pro mixture (Flash for speed, Pro for deep refactors). | 30m |
-| **5** | **Showdown & Takeaways** | Celebrate the 94.2% $\to$ 99.24% leap. Discuss customer enterprise applications (Fleet routing, FinOps, LLM prompt optimization). | 30m |
+| **5** | **Showdown & Takeaways** | Celebrate the 97.47% $\to$ 99.20% leap, or the $7.35\times$ parameter compression down to 2,978 parameters scoring 98.45%! Discuss customer enterprise applications (Embedded vision, MCU/Edge IoT, FinOps, LLM prompt optimization). | 30m |
 | **Q&A** | **Open Discussion** | Wrap up and Q&A. | 15m |
 | **Total** | | | **~2h 30m** |

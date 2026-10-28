@@ -5,7 +5,7 @@ Welcome to **Step 2**! In this step, we uncover the three architectural pillars 
 ---
 
 ## 🎯 Learning Objectives
-1. **Pillar 1: System Prompt (`instructions.md`):** How we instruct Gemini to search for architectures within specific shape, metric (`reward`), and multi-objective constraints (`val_accuracy > 98%`, `param_count < 50,000`), dynamically injected from `.env`.
+1. **Pillar 1: System Prompt (`instructions.md`):** How we instruct Gemini to search for architectures within specific shape, metric (`reward`), and multi-objective constraints (`val_accuracy > TARGET_ACCURACY`, `param_count < TARGET_PARAMS`), dynamically injected from `.env` (e.g. `< 4,000` for micro-nets, `< 50,000` for standard).
 2. **Pillar 2: The Mutation Boundary (`# EVOLVE-BLOCK`):** How we constrain the LLM to modify only specific functions while keeping harnesses immutable.
 3. **Pillar 3: The Insight Feedback Loop:** Why AlphaEvolve outperforms traditional black-box search by feeding error tracebacks and budget constraint violations back into the LLM context.
 

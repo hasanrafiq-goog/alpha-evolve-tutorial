@@ -42,6 +42,7 @@ RUN #  | PROGRAM ID             | CREATED TIME        | RANK    | REWARD     | V
 
 Step 5 automatically benchmarks your **freshly evolved Top N models from Step 4** against the naive baseline on the **full 60,000 dataset**:
 
+### Scenario A: High-Accuracy Target (`TARGET_PARAMS=50000`, `TARGET_ACCURACY=0.98`)
 ```
 ===============================================================================================
 FINAL RANK   | MODEL NAME                     | PARAMS     | FULL TEST ACC  | ERROR REDUCT  | TRAIN TIME
@@ -52,10 +53,21 @@ FINAL RANK   | MODEL NAME                     | PARAMS     | FULL TEST ACC  | ER
 -----------------------------------------------------------------------------------------------
 Reference    | Baseline Seed Model            | 21,898     |  97.47% (Base)    |   0.0%        |   5.5s
 ===============================================================================================
+```
+
+### Scenario B: Ultra-Compact Edge Micro-Controller (`TARGET_PARAMS=4000`, `TARGET_ACCURACY=0.94`)
+```
+===============================================================================================
+FINAL RANK   | MODEL NAME                     | PARAMS     | FULL TEST ACC  | ERROR REDUCT  | TRAIN TIME
+===============================================================================================
+#1           | AlphaEvolve Finalist Rank #1 🏆 |  2,978     |  98.45% (+0.98%)  | - 38.7%       |  12.3s
+-----------------------------------------------------------------------------------------------
+Reference    | Baseline Seed Model            | 21,898     |  97.47% (Base)    |   0.0%        |   5.5s
+===============================================================================================
 
 🎉 Tournament Conclusion:
-The Grand Finale Champion is AlphaEvolve Finalist Rank #3!
-Achieved 99.20% accuracy on the full dataset (68.4% fewer errors than baseline) with only 65,994 parameters!
+The Grand Finale Champion is mnist_efficient_net (2,978 parameters)!
+Achieved 98.45% accuracy while cutting model parameter size by 7.35x (-86.4%) compared to baseline!
 ```
 
 ---

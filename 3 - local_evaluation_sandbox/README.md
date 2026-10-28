@@ -10,7 +10,7 @@ This step runs **100% locally with ZERO Google Cloud API calls and ZERO cost**.
 1. Understand why evaluation runs on the **client-side** (workstation/cluster) rather than on Gemini's cloud servers.
 2. Master the concept of **Proxy Evaluation**: training on a 10,000-image slice for 2 epochs (~0.7 seconds) to achieve rapid evolutionary iterations.
 3. Understand safe sandboxed execution with `exec()` and pre-flight tensor shape validation.
-4. Learn how the **Vertex AI NAS Multi-Objective Reward** combines accuracy with parameter budget constraints (`< 50,000` params).
+4. Learn how the **Vertex AI NAS Multi-Objective Reward** combines accuracy with parameter budget constraints (e.g. `< 4,000` for micro-nets or `< 50,000` for standard models).
 5. Run `test_evaluator.py` to see unit tests and proxy candidate evaluation on your machine.
 
 ---
