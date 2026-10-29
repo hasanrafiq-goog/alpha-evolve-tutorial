@@ -47,11 +47,11 @@ Step 5 automatically benchmarks your **freshly evolved Top N models from Step 4*
 ===============================================================================================
 FINAL RANK   | MODEL NAME                     | PARAMS     | FULL TEST ACC  | ERROR REDUCT  | TRAIN TIME
 ===============================================================================================
-#1           | AlphaEvolve Finalist Rank #3 🏆 | 65,994     |  99.20% (+1.73%)  | - 68.4%       |  21.1s
-#2           | AlphaEvolve Finalist Rank #2   | 74,101     |  99.14% (+1.67%)  | - 66.0%       |  21.6s
-#3           | AlphaEvolve Finalist Rank #1   | 72,266     |  99.13% (+1.66%)  | - 65.6%       |  32.6s
+#1           | AlphaEvolve Finalist Rank #3 🏆 | 65,994     |  99.20% (+3.80%)  | - 82.6%       |  21.1s
+#2           | AlphaEvolve Finalist Rank #2   | 74,101     |  99.14% (+3.74%)  | - 81.3%       |  21.6s
+#3           | AlphaEvolve Finalist Rank #1   | 72,266     |  99.13% (+3.73%)  | - 81.1%       |  32.6s
 -----------------------------------------------------------------------------------------------
-Reference    | Baseline Seed Model            | 21,898     |  97.47% (Base)    |   0.0%        |   5.5s
+Reference    | Baseline Seed Model            | 21,898     |  95.40% (Base)    |   0.0%        |   5.5s
 ===============================================================================================
 ```
 
@@ -60,14 +60,14 @@ Reference    | Baseline Seed Model            | 21,898     |  97.47% (Base)    |
 ===============================================================================================
 FINAL RANK   | MODEL NAME                     | PARAMS     | FULL TEST ACC  | ERROR REDUCT  | TRAIN TIME
 ===============================================================================================
-#1           | AlphaEvolve Finalist Rank #1 🏆 |  2,978     |  98.45% (+0.98%)  | - 38.7%       |  12.3s
+#1           | AlphaEvolve Finalist Rank #1 🏆 |  2,978     |  98.45% (+3.05%)  | - 66.3%       |  12.3s
 -----------------------------------------------------------------------------------------------
-Reference    | Baseline Seed Model            | 21,898     |  97.47% (Base)    |   0.0%        |   5.5s
+Reference    | Baseline Seed Model            | 21,898     |  95.40% (Base)    |   0.0%        |   5.5s
 ===============================================================================================
 
 🎉 Tournament Conclusion:
 The Grand Finale Champion is mnist_efficient_net (2,978 parameters)!
-Achieved 98.45% accuracy while cutting model parameter size by 7.35x (-86.4%) compared to baseline!
+Achieved 98.45% accuracy while cutting model parameter size by 7.35x (-86.4%) and slashing classification errors by 66.3% compared to baseline!
 ```
 
 ---
@@ -89,6 +89,6 @@ Execute the single runner script:
 ---
 
 ## 🎤 Presenter Speaking Notes (For PSO Trainers)
-* *"Look at the starting baseline: a naive 1-conv model scoring ~88%. Over 1,100 handwritten digits misclassified!"*
-* *"Without any human writing code, Gemini diagnosed the capacity bottleneck, stacked convolutions, and added hierarchical regularization to score 99.15%."*
-* *"That is a 13x reduction in customer error rates discovered fully autonomously using AlphaEvolve on Google Cloud."*
+* *"Look at the starting baseline: a naive 1-conv model scoring 95.40%. Over 460 handwritten digits misclassified!"*
+* *"Without any human writing code, Gemini diagnosed the capacity bottleneck, stacked convolutions, or engineered extreme micro-separable topologies to score up to 99.20% (or 98.45% with 7.35x fewer parameters)!"*
+* *"That is a massive reduction in error rates (cutting errors by up to 66.3% to 82.6%) discovered fully autonomously using AlphaEvolve on Google Cloud."*
