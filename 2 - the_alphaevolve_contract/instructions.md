@@ -27,6 +27,7 @@ Feel free to explore modern deep learning architectural primitives, including:
 - **Normalization & Regularization**: Batch Normalization (`tf.keras.layers.BatchNormalization`), Spatial Dropout, Layer Normalization.
 - **Activations**: Advanced activation functions like GELU, Swish/SiLU (`tf.nn.silu` or `activation="swish"`), LeakyReLU, or Mish.
 - **Attention & Pooling**: Squeeze-and-Excitation channel attention blocks, Global Average Pooling vs Flattening.
+- **Beyond Conventional Topologies**: You are explicitly encouraged to think outside standard CNN patterns. Feel free to experiment with inverted bottleneck blocks (MobileNet/GhostNet-inspired), novel mathematical projections, hybrid convolutional-pooling schemes, or unconventional layer combinations, provided they compile cleanly in Keras.
 
 ## Rules
 - Do NOT hardcode training epochs, optimizers, or loss functions inside `build_model()`; only define the architecture topology.
