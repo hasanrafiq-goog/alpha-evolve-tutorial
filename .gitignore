@@ -27,3 +27,11 @@ __pycache__/
 *$py.class
 *.so
 .pytest_cache/
+
+# ==========================================
+# Spec Kit Artifacts & Planning
+# ==========================================
+.specify/
+docs/
+specs/
+

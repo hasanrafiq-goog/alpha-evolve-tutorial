@@ -184,7 +184,8 @@ cd "../3 - local_evaluation_sandbox"
 3. **Concurrent Workers:**
    * `SamplingWorker`: Asynchronously pulls proposed candidate codes from Google Cloud.
    * `EvaluationWorker`: Spawns local evaluation threads, runs proxy training, computes Vertex AI NAS reward, and submits scores + insights back to the cloud database.
-4. **Top N Finalists Export:** Automatically exports the top $N$ ranked models (`rank_1_model.py`, `rank_2_model.py`, ..., `rank_N_model.py`) as configured by `TOP_N_MODELS` in `.env`.
+4. **Live Search Console Dashboard (`http://localhost:8080`):** Automatically opens an interactive browser UI streaming real-time KPI cards (top accuracy, size reduction), trajectory line charts, non-dominated Pareto scatter plots, and an interactive candidate code/traceback inspection modal. Zero extra pip/CDN dependencies.
+5. **Top N Finalists Export:** Automatically exports the top $N$ ranked models (`rank_1_model.py`, `rank_2_model.py`, ..., `rank_N_model.py`) as configured by `TOP_N_MODELS` in `.env`.
 
 #### ⚙️ Configuration Prerequisite:
 Before running Step 4, ensure your real GCP values and targets are set in `.env`:

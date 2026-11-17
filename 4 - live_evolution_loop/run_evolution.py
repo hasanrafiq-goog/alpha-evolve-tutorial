@@ -10,6 +10,8 @@ import json
 import logging
 import os
 import sys
+import threading
+import time
 from typing import Any, Dict
 
 import nest_asyncio
@@ -24,6 +26,9 @@ from alpha_evolve.client import AlphaEvolveClient
 from alpha_evolve.controller import run_controller_loop
 from alpha_evolve.experiment import AlphaEvolveExperiment
 from alpha_evolve.visualization import get_score
+
+from dashboard_server import start_dashboard_server
+from session_manager import DashboardSessionManager, extract_mutation_summary
 
 from evaluate import (
     INITIAL_PROGRAM_CODE,
@@ -80,6 +85,90 @@ def main():
     logger.info("=== Starting AlphaEvolve MNIST Architecture Search ===")
     logger.info("Project: %s | App Engine ID: %s | Max Evals: %d", PROJECT_ID, GE_APP_ID, MAX_PROGRAMS_EVALUATED)
 
+    output_dir = os.path.join(os.path.dirname(__file__), "evolved_output")
+    os.makedirs(output_dir, exist_ok=True)
+
+    # Initialize Dashboard Session Manager
+    session_manager = DashboardSessionManager(
+        output_dir=output_dir,
+        target_params=TARGET_PARAMS,
+        target_accuracy=TARGET_ACCURACY,
+        max_programs=MAX_PROGRAMS_EVALUATED,
+        baseline_accuracy=0.9540,
+        baseline_params=21898,
+    )
+
+    # Record Seed baseline candidate (Run 0, Base)
+    session_manager.record_candidate(
+        run_number=0,
+        candidate_id="...seed",
+        rank="Base",
+        nas_reward=SEED_BOOTSTRAP_SCORE,
+        val_accuracy=0.9540,
+        param_count=21898,
+        train_time_sec=0.0,
+        mutation_summary="Naive 1-Conv Baseline (mnist_naive_baseline)",
+        status="SEED",
+        code_content=INITIAL_PROGRAM_CODE,
+        insights=["Initial naive baseline architecture."],
+    )
+
+    # Launch Dashboard Server Daemon (Dynamic Port Hunting + Browser Auto-launch)
+    dashboard_port = int(os.getenv("DASHBOARD_PORT", os.getenv("PORT", "8080")))
+    auto_open = os.getenv("AUTO_OPEN_DASHBOARD", "True").lower() == "true"
+    dashboard_server = start_dashboard_server(
+        session_manager=session_manager,
+        port=dashboard_port,
+        auto_open=auto_open,
+    )
+
+    # Thread-safe tracked evaluation wrapper for Dual-Channel Observability
+    run_counter = 0
+    run_counter_lock = threading.Lock()
+
+    def tracked_evaluation(program_candidate: dict) -> dict:
+        nonlocal run_counter
+        with run_counter_lock:
+            run_counter += 1
+            current_run = run_counter
+
+        prog_id = program_candidate.get("name", "unknown")
+        session_manager.set_in_flight(current_run, prog_id)
+
+        try:
+            # Execute actual local proxy training and referee logic (logs to stdout)
+            result = mnist_evaluation(program_candidate)
+            code = program_candidate["content"]["files"][0]["content"]
+            mutation_desc = extract_mutation_summary(code)
+
+            score_map = {s["metric"]: s["score"] for s in result.get("scores", {}).get("scores", [])}
+            insights_list = [i.get("text", "") for i in result.get("insights", {}).get("insights", [])]
+
+            primary_reward = score_map.get(PRIMARY_METRIC_NAME, SEED_BOOTSTRAP_SCORE)
+            val_acc = score_map.get("val_accuracy", 0.0)
+            param_cnt = int(score_map.get("param_count", 0))
+            train_time = score_map.get("train_time_sec", 0.0)
+            status = "SUCCESS" if primary_reward > 0.1 else "PENALTY"
+
+            session_manager.record_candidate(
+                run_number=current_run,
+                candidate_id=prog_id,
+                rank="-",
+                nas_reward=primary_reward,
+                val_accuracy=val_acc,
+                param_count=param_cnt,
+                train_time_sec=train_time,
+                mutation_summary=mutation_desc,
+                status=status,
+                code_content=code,
+                insights=insights_list,
+                metrics=score_map,
+            )
+            return result
+        except Exception:
+            session_manager.clear_in_flight()
+            raise
+
     # 1. Initialize AlphaEvolve API Client
     client = AlphaEvolveClient(
         project_id=PROJECT_ID,
@@ -93,7 +182,7 @@ def main():
     # 2. Configure Experiment Instance
     experiment = AlphaEvolveExperiment(
         ae_client=client,
-        evaluator_function=mnist_evaluation,
+        evaluator_function=tracked_evaluation,
         max_programs_evaluated=MAX_PROGRAMS_EVALUATED,
         parallel_evaluation=PARALLEL_EVALUATION,
     )
@@ -231,10 +320,26 @@ def main():
                 indent=2,
             )
         logger.info("Saved top %d finalist metadata summary to %s", len(top_n_records), meta_file)
+
+        # Update candidate records in session manager with tournament ranks
+        session_manager.update_final_ranks(top_n_records)
     else:
         logger.warning("No evolved programs returned from experiment.")
 
+    session_manager.complete_session()
     logger.info("=== AlphaEvolve Search Finished Successfully ===")
+
+    if dashboard_server:
+        logger.info(
+            "Dashboard server is active at http://localhost:%d (Press Ctrl+C to terminate).",
+            dashboard_server.port,
+        )
+        try:
+            while True:
+                time.sleep(1)
+        except KeyboardInterrupt:
+            logger.info("Stopping dashboard server...")
+            dashboard_server.stop()
 
 
 if __name__ == "__main__":

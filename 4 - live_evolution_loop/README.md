@@ -13,8 +13,47 @@ Welcome to **Step 4**! In this step, we connect your local machine to **Google C
 1. Understand the **Gemini Ensemble**: combining fast exploration (`gemini-3.5-flash`) with deep reasoning (`gemini-3.1-pro-preview`).
 2. Learn how **Sampling Workers** and **Evaluation Workers** operate concurrently.
 3. Observe live evolutionary generations proposing novel convolutions, skip connections, and normalization.
-4. Enforce edge parameter constraints (`TARGET_PARAMS < 4,000` for micro-nets or `< 50,000` for standard) and accuracy goals via the **Vertex AI NAS Reward**.
-5. Export the **Top N Finalist Architectures** (`rank_1_model.py` through `rank_N_model.py` and `best_model.py`) for the Step 5 Grand Finale.
+4. Monitor the search in real time via the **Live Evolution Web Dashboard** (`http://localhost:8080`), tracking KPI cards, reward trajectories, and Pareto frontiers.
+5. Enforce edge parameter constraints (`TARGET_PARAMS < 4,000` for micro-nets or `< 50,000` for standard) and accuracy goals via the **Vertex AI NAS Reward**.
+6. Export the **Top N Finalist Architectures** (`rank_1_model.py` through `rank_N_model.py` and `best_model.py`) for the Step 5 Grand Finale.
+
+---
+
+## 📊 Live Evolution Search Console (Web Dashboard)
+
+Step 4 launches a zero-dependency local web dashboard that matches the **Google Cloud AlphaEvolve Architecture Search Console**:
+
+```
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│ 🚀 AlphaEvolve Architecture Search Console             [● In Progress (12/20)] [Session ▾] │
+├───────────────────┬───────────────────┬───────────────────┬────────────────────────────┤
+│ Top Accuracy      │ Optimal Size      │ Convergence Eff.  │ Exploration Rate           │
+│ 96.80% (+1.40%)   │ 2,746 (-87.5%)    │ Run #8 / 20       │ 100% Zero-Touch            │
+├───────────────────┴───────────────────┴───────────────────┴────────────────────────────┤
+│ [ Line Chart: Multi-Objective Reward Trajectory ] [ Scatter Plot: Pareto Frontier ]    │
+├────────────────────────────────────────────────────────────────────────────────────────┤
+│ Execution History:                                                                     │
+│ Run #   Candidate ID   Status   Reward   Val Acc   Params   Mutation Summary            │
+│ -------------------------------------------------------------------------------------- │
+│ 1       ...3699149     RANK 1 ⭐️0.5512   96.80%     2,746   SeparableConv2D + Swish     │
+│ 2       ...4820152     RANK 2   0.4820   96.20%     3,120   Depthwise Conv Residual     │
+│ 3       ...5910214     RANK 3   0.4100   95.90%     3,450   Spatial Pyramid Pooling     │
+│ 4       ...6012891     —        0.1250   91.20%     4,800   Dense Inverted Residual     │
+└────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Dashboard Highlights:
+* **Zero External Dependencies:** Built entirely with Python's standard library (`http.server`, `threading`, `json`) and locally bundled `Chart.js` — runs completely air-gapped without CDN access or Node.js.
+* **Faithful Visual Charts:**
+  - **Reward Trajectory Chart:** Plots each candidate's exact individual evaluation score, highlighting breakthrough high-water mark models with **green milestone dots** and regular exploration runs with **blue dots**.
+  - **Pareto Frontier Scatter Plot:** Zoomed in tightly on the micro-architecture scale (< 4k parameters) with subtle dashed target guide lines marking `TARGET_PARAMS` and `TARGET_ACCURACY`. The 22k seed baseline is completely filtered out of both charts and tables so it never distorts the scale.
+* **Dynamic Rank 1 Champion KPIs:** The "Top Accuracy" and "Optimal Size" cards strictly and dynamically track the **Rank 1 Champion** model with zero hardcoded values.
+* **Single-Champion Leaderboard:** Real-time dynamic ranking guarantees at most one `RANK 1 ⭐️` champion at any moment, completely decoupled from candidate arrival numbers.
+* **Dual-Channel Observability:** Full CLI terminal output remains 100% unsuppressed while streaming telemetry to the web browser.
+* **Auto-Launch & Port Hunting:** Auto-opens your default browser at `http://localhost:8080` (auto-hunts 8080-8090 if the port is busy). Configure via `PORT` or `DASHBOARD_PORT`.
+* **Interactive Code & Traceback Modal:** Click any candidate row in the execution table or any point on the Pareto scatter plot to slide open the full generated Python `build_model()` code, metrics breakdown, and compiler/evaluator insights.
+* **Multi-Session History Selector:** Prior search runs are automatically archived in `evolved_output/history/` and can be toggled at any time using the header session dropdown.
+* **Post-Run Persistence:** Once the evolutionary loop finishes, the web dashboard remains running so you can inspect finalist architectures until you press `Ctrl+C`.
 
 ---
 

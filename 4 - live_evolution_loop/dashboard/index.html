@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Google Cloud AlphaEvolve • Architecture Search Console</title>
+  <link rel="stylesheet" href="assets/style.css">
+  <script src="assets/chart.umd.min.js"></script>
+</head>
+<body>
+  <!-- Header Navbar -->
+  <header class="console-header">
+    <div class="header-left">
+      <div class="google-dots">
+        <span class="dot blue"></span>
+        <span class="dot red"></span>
+        <span class="dot yellow"></span>
+        <span class="dot green"></span>
+      </div>
+      <div class="header-title-group">
+        <h1 class="header-title">Google Cloud AlphaEvolve <span class="header-sep">•</span> Architecture Search Console</h1>
+        <p class="header-subtitle">Discovery Engine API • Gemini 3.5 Flash + Gemini 3.1 Pro Preview Closed-Loop Multi-Objective NAS</p>
+      </div>
+    </div>
+    <div class="header-right">
+      <select id="session-select" class="session-dropdown" aria-label="Select Search Session"></select>
+      <span id="session-status-badge" class="badge badge-warning">
+        <span class="pulse-indicator"></span><span id="status-text">Initializing Search...</span>
+      </span>
+      <span id="budget-badge" class="badge badge-outline">Budget: Parameter Constrained</span>
+      <span id="metric-badge" class="badge badge-accent">Metric: Vertex AI NAS Reward</span>
+    </div>
+  </header>
+
+  <!-- Main Dashboard Content -->
+  <main class="console-main">
+    <!-- Top Summary KPI Cards -->
+    <section class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-label">TOP DISCOVERED ACCURACY</div>
+        <div class="kpi-value-row">
+          <span id="kpi-top-acc" class="kpi-number">—</span>
+          <span id="kpi-acc-delta" class="kpi-pill pill-green" style="display: none;">+0.00%</span>
+        </div>
+        <div id="kpi-acc-subtext" class="kpi-sub">Waiting for Candidate #1...</div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-label">OPTIMAL PARAMETER FOOTPRINT</div>
+        <div class="kpi-value-row">
+          <span id="kpi-optimal-params" class="kpi-number">—</span>
+          <span id="kpi-param-delta" class="kpi-pill pill-blue" style="display: none;">0.0% Size</span>
+        </div>
+        <div id="kpi-param-subtext" class="kpi-sub">Waiting for Candidate #1...</div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-label">CONVERGENCE EFFICIENCY</div>
+        <div class="kpi-value-row">
+          <span id="kpi-efficiency" class="kpi-number">—</span>
+          <span id="kpi-efficiency-time" class="kpi-pill-text"></span>
+        </div>
+        <div class="kpi-sub">Grand champion discovered within iterations</div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-label">AUTONOMOUS EXPLORATION RATE</div>
+        <div class="kpi-value-row">
+          <span id="kpi-exploration-rate" class="kpi-number">100% Zero-Touch</span>
+        </div>
+        <div class="kpi-sub">Closed-loop traceback & penalty insight feedback</div>
+      </div>
+    </section>
+
+    <!-- 2-Column Grid: Execution Log Table & Dynamic Visual Charts -->
+    <div class="dashboard-split-layout">
+      <!-- Left Column: Chronological Execution Log -->
+      <section class="console-card table-panel">
+        <div class="panel-header">
+          <h2 class="panel-title">Chronological Search Execution Log</h2>
+          <span id="runs-count-badge" class="table-count-badge">0 Candidates Generated & Evaluated</span>
+        </div>
+        <div class="table-container">
+          <table class="runs-table">
+            <thead>
+              <tr>
+                <th>RUN #</th>
+                <th>CANDIDATE ID</th>
+                <th>RANK</th>
+                <th>NAS REWARD</th>
+                <th>VAL ACC</th>
+                <th>PARAMS</th>
+                <th>ARCHITECTURE MUTATION</th>
+              </tr>
+            </thead>
+            <tbody id="runs-table-body">
+              <!-- Dynamically rendered rows -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Right Column: Visual Charts -->
+      <section class="charts-panel">
+        <!-- Top Chart: Reward Trajectory -->
+        <div class="console-card chart-card">
+          <div class="panel-header chart-header-row">
+            <div>
+              <h2 class="panel-title">Vertex AI NAS Reward Trajectory (Multi-Objective)</h2>
+              <div id="trajectory-subtitle" class="chart-subtitle">Tracking best-discovered reward progression over generations</div>
+            </div>
+          </div>
+          <div class="chart-wrapper">
+            <canvas id="trajectory-chart"></canvas>
+          </div>
+        </div>
+
+        <!-- Bottom Chart: Pareto Frontier -->
+        <div class="console-card chart-card">
+          <div class="panel-header chart-header-row">
+            <div>
+              <h2 class="panel-title">Pareto Frontier: Parameter Count vs. Accuracy</h2>
+              <div class="chart-subtitle">Dominating trade-off curve across generations (Green = Optimal Pareto Models)</div>
+            </div>
+          </div>
+          <div class="chart-wrapper">
+            <canvas id="pareto-chart"></canvas>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <!-- Interactive Candidate Code & Insight Inspection Modal -->
+  <div id="candidate-modal" class="modal-backdrop" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <div class="modal-header-info">
+          <h3 id="modal-title" class="modal-title">Candidate Details</h3>
+          <span id="modal-rank-badge" class="badge"></span>
+        </div>
+        <button id="modal-close" class="modal-close-btn" aria-label="Close modal">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="modal-section">
+          <h4 class="section-label">Evaluation Metrics</h4>
+          <div id="modal-metrics" class="modal-metrics-grid"></div>
+        </div>
+
+        <div class="modal-section">
+          <div class="code-header">
+            <h4 class="section-label">Generated Python Topology (build_model)</h4>
+            <button id="modal-copy-btn" class="copy-btn">Copy Code</button>
+          </div>
+          <pre class="code-block"><code id="modal-code"></code></pre>
+        </div>
+
+        <div class="modal-section">
+          <h4 class="section-label">Evaluator Tracebacks & Insights Fed to Gemini</h4>
+          <div id="modal-insights" class="insights-container"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="assets/dashboard.js"></script>
+</body>
+</html>
